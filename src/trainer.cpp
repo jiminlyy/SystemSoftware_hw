@@ -22,6 +22,7 @@ namespace
         //
         // This flag can be used in the main loop to notice that a SIGCHLD
         // was delivered and then call wait()/waitpid() to reap children.
+        g_child_exited = 1;
     }
 
     void set_cloexec(int fd)
@@ -34,6 +35,20 @@ namespace
         //
         // This prevents child processes (after exec) from inheriting
         // these pipe descriptors unintentionally.
+        int flags = fcntl(fd, F_GETFD);
+        if (flags < 0)
+        {
+            std::perror("fcntl F_GETFD");
+            return; // 오류 시 조기 리턴
+        }
+
+        // FD_CLOEXEC 플래그를 추가합니다.
+        flags |= FD_CLOEXEC;
+
+        if (fcntl(fd, F_SETFD, flags) < 0)
+        {
+            std::perror("fcntl F_SETFD");
+        }
     }
 
     int spawn_child(const char *prog,
@@ -61,7 +76,50 @@ namespace
         //
         // This function does NOT close any file descriptors; the caller
         // (trainer::run) remains responsible for closing unused pipe ends.
-        return -1; // placeholder return to keep the skeleton compilable
+        pid_t pid = fork();
+
+        if (pid < 0)
+        {
+            // Error handling: fork 실패
+            std::perror("fork");
+            return -1;
+        }
+
+        if (pid == 0) // Child process
+        {
+            // 1. STDIN 리다이렉션
+            if (stdin_fd >= 0 && stdin_fd != STDIN_FILENO)
+            {
+                if (dup2(stdin_fd, STDIN_FILENO) < 0)
+                {
+                    std::perror("dup2 stdin");
+                    _exit(1); // 자식은 _exit 사용
+                }
+            }
+
+            // 2. STDOUT 리다이렉션
+            if (stdout_fd >= 0 && stdout_fd != STDOUT_FILENO)
+            {
+                if (dup2(stdout_fd, STDOUT_FILENO) < 0)
+                {
+                    std::perror("dup2 stdout");
+                    _exit(1); // 자식은 _exit 사용
+                }
+            }
+
+            // 3. 프로그램 실행
+            // execvp는 성공 시 리턴하지 않음. 오류 시에만 아래 코드가 실행됨.
+            execvp(prog, argv);
+
+            // execvp 오류 처리
+            std::perror("execvp");
+            _exit(1);
+        }
+        else // Parent process
+        {
+            // 부모는 자식의 PID를 반환
+            return pid;
+        }
     }
 
 
