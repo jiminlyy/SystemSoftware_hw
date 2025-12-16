@@ -117,10 +117,14 @@ run_phase() {
   local summary=""
   # TODO: summary=...
 
+  # 1) Find the last such line in "$log_file" and store it in 'summary'.
+  # 'grep'으로 SUMMARY로 시작하는 라인을 찾고, 'tail -n 1'로 마지막 라인을 추출합니다.
+  summary=$(grep '^SUMMARY ' "$log_file" | tail -n 1)
+  
   if [[ -n "$summary" ]]; then
     local _tag samples avg_loss avg_yhat
     # TODO: read -r ...
-
+  read -r _tag samples avg_loss avg_yhat <<< "$summary"
     echo "[run] Phase '$phase' summary: samples=$samples avg_loss=$avg_loss avg_yhat=$avg_yhat"
   else
     echo "[run] Phase '$phase' summary: (no SUMMARY line found)"
