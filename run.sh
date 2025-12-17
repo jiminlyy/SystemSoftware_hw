@@ -59,7 +59,7 @@ progress_bar() {
 #   - After completion, extract a SUMMARY line and print a short summary.
 # --------------------------------------------------------------------
 run_phase() {
-  local phase="$1"      # "train" or "test"
+local phase="$1"
   local csv="$2"
   local log_file="$3"
   local err_file="$4"
@@ -69,21 +69,12 @@ run_phase() {
     return 1
   fi
 
-  # Count total non-empty lines in the CSV.
   local total_lines
   total_lines=$(grep -cve '^\s*$' "$csv" || echo 0)
 
   echo "[run] Phase: $phase, file: $csv"
-  echo "[run] Total lines: $total_lines"
-  echo "[run] Logs: $log_file, errors: $err_file"
-
   local SAMPLES_PROCESSED=0
 
-  # Pipeline:
-  #   trainer stdout  -> tee (log_file + progress loop)
-  #   trainer stderr  -> err_file
-  #
-  # The logger prints lines starting with "SAMPLE" for each sample.
   BACKWARD_MODE="$phase" "$TRAINER" "$csv" 2> "$err_file" | \
   tee "$log_file" | \
   while IFS= read -r line; do
@@ -93,46 +84,24 @@ run_phase() {
     fi
   done
 
-  echo
+  echo "" # 줄바꿈
 
   # ------------------------------------------------------------------
-  # TODO: Extract and print phase summary from "$log_file".
-  #
-  # The logger writes a final line of the form:
-  #   SUMMARY <samples> <avg_loss> <avg_yhat>
-  #
-  # 1) Find the last such line in "$log_file" and store it in 'summary'.
-  #    If no such line exists, 'summary' should be empty.
-  #
-  # 2) If 'summary' is non-empty:
-  #      - Parse it into variables: samples, avg_loss, avg_yhat.
-  #        (The first field is the literal word "SUMMARY".)
-  #      - Print:
-  #          [run] Phase '<phase>' summary: samples=<samples> avg_loss=<avg_loss> avg_yhat=<avg_yhat>
-  #
-  #    Otherwise:
-  #      - Print:
-  #          [run] Phase '<phase>' summary: (no SUMMARY line found)
+  # TODO 완료: SUMMARY 추출 및 출력
   # ------------------------------------------------------------------
-  local summary=""
-  # TODO: summary=...
+  local summary
+  summary=$(grep "^SUMMARY" "$log_file" | tail -n 1)
 
-  # 1) Find the last such line in "$log_file" and store it in 'summary'.
-  # 'grep'으로 SUMMARY로 시작하는 라인을 찾고, 'tail -n 1'로 마지막 라인을 추출합니다.
-  summary=$(grep '^SUMMARY ' "$log_file" | tail -n 1)
-  
   if [[ -n "$summary" ]]; then
     local _tag samples avg_loss avg_yhat
-    # TODO: read -r ...
-  read -r _tag samples avg_loss avg_yhat <<< "$summary"
+    read -r _tag samples avg_loss avg_yhat <<< "$summary"
     echo "[run] Phase '$phase' summary: samples=$samples avg_loss=$avg_loss avg_yhat=$avg_yhat"
   else
     echo "[run] Phase '$phase' summary: (no SUMMARY line found)"
   fi
 
   echo "[run] Phase '$phase' finished."
-  echo "[run] Final logs: $log_file"
-}
+} 
 
 # -------- PRE-TRAIN TEST (baseline) --------
 run_phase "test" "$TEST_CSV" \
