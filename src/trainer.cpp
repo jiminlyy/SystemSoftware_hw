@@ -34,20 +34,19 @@ namespace
         // 3. Use fcntl(fd, F_SETFD, new_flags) to update.
         //
         // This prevents child processes (after exec) from inheriting
-        // these pipe descriptors unintentionally.
-        int flags = fcntl(fd, F_GETFD);
-        if (flags < 0)
+   	// these pipe descriptors unintentionally.
+    	int flags = fcntl(fd, F_GETFD);
+        if (flags >= 0)
+        {
+            flags |= FD_CLOEXEC;
+            if (fcntl(fd, F_SETFD, flags) < 0)
+            {
+                std::perror("fcntl F_SETFD");
+            }
+        }
+        else
         {
             std::perror("fcntl F_GETFD");
-            return; // 오류 시 조기 리턴
-        }
-
-        // FD_CLOEXEC 플래그를 추가합니다.
-        flags |= FD_CLOEXEC;
-
-        if (fcntl(fd, F_SETFD, flags) < 0)
-        {
-            std::perror("fcntl F_SETFD");
         }
     }
 
@@ -115,11 +114,11 @@ namespace
             std::perror("execvp");
             _exit(1);
         }
-        else // Parent process
-        {
+         // Parent process
+        
             // 부모는 자식의 PID를 반환
             return pid;
-        }
+        
     }
 
 
